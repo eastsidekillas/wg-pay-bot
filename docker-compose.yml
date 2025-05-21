@@ -1,0 +1,71 @@
+x-common-variables: &common-variables
+  DJANGO_SECRET_KEY:
+  DEBUG:
+  PUBLIC_HOST:
+  DATABASE_ENGINE: django.db.backends.postgresql
+  DATABASE_NAME: afisha_lesnoy
+  DATABASE_USER: afisha_lesnoy
+  DATABASE_PASSWORD: afisha_lesnoy
+  DATABASE_HOST: postgres
+  DATABASE_PORT: 5432
+  STATIC_ROOT: /app/static
+  MEDIA_ROOT: /app/media
+  MEDIA_URL:
+
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      - "8000:8000"
+    environment: *common-variables
+    volumes:
+      - media:/app/media
+    depends_on:
+      - postgres
+      - migration
+    working_dir: /app/src
+
+  bot:
+    build: .
+    env_file: .env
+    environment: *common-variables
+    command: ["python", "manage_bot.py"]
+    working_dir: /app/src
+    depends_on:
+      - postgres
+  
+  collectstatic:
+    build: .
+    user: root
+    env_file: .env
+    environment: *common-variables
+    volumes:
+      - static:/app/static
+    command: ["python", "-m", "django", "collectstatic", "--no-input"]
+    working_dir: /app/src
+
+  migration:
+    build: .
+    env_file: .env
+    environment: *common-variables
+    command: ["python", "-m", "django", "migrate", "--no-input"]
+    depends_on:
+      - postgres
+    working_dir: /app/src
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: afisha_lesnoy
+      POSTGRES_PASSWORD: afisha_lesnoy
+      POSTGRES_DB: afisha_lesnoy
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  static:
+  media:
