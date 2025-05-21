@@ -300,17 +300,22 @@ async def cmd_support(message: Message):
         parse_mode="HTML",
     )
 
-    # Ссылка на админа
-    admin_username = await get_user_by_id(settings.ADMINS[0])
-    if admin_username:
-        admin_telegram_link = f"https://t.me/{admin_username}"
-        await message.answer(
-            f"❓ Если у тебя все ещё остались вопросы, напиши {hlink('мне', admin_telegram_link)} лично.",
-            parse_mode="HTML",
-        )
-        await message.answer("🔙 Вернуться в меню?", reply_markup=back_to_main_menu_kb())
+    admin_id = settings.ADMINS[0] if settings.ADMINS else None
+
+    if admin_id:
+        admin_user = await get_user_by_id(admin_id)
+        if admin_user and admin_user.username:
+            admin_link = f"https://t.me/{admin_user.username}"
+            await message.answer(
+                f"❓ Если у тебя всё ещё остались вопросы, напиши {hlink('мне', admin_link)} лично.",
+                parse_mode="HTML",
+            )
+        else:
+            await message.answer("❗ Не удалось найти username администратора.")
     else:
-        await message.answer("❗ Не удалось найти администратора для связи.")
+        await message.answer("❗ Администратор не задан в настройках.")
+
+    await message.answer("🔙 Вернуться в меню?", reply_markup=back_to_main_menu_kb())
 
 
 @router.message(F.text == "🔙 Назад")
