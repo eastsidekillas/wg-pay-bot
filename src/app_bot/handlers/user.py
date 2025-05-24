@@ -106,16 +106,24 @@ async def selected_plan_handler(callback: types.CallbackQuery, state: FSMContext
     await state.update_data(selected_plan_id=plan_id)
     plan = await sync_to_async(lambda: Plan.objects.get(id=plan_id))()
 
-    # Здесь может быть отправка инвойса, но пока просто инструкция
+    message_text = (
+        f"✅ Вы выбрали тарифный план: <b>{plan.name}</b>\n\n"
+        f"<b>Описание:</b> {plan.description}\n"
+        f"<b>Цена:</b> {plan.price}₽\n"
+        f"<b>Срок действия:</b> {plan.duration_days} дней\n\n"
+        f"💳 Для оплаты переведите <b>{plan.price}₽</b> на карту:\n"
+        f"<code>{settings.PAYMENT_PHONE}</code>\n\n"
+        f"📸 После оплаты отправьте скриншот перевода для подтверждения."
+    )
+
     await callback.message.answer(
-        f"Вы выбрали тариф: {plan.name}\n"
-        f"Цена: {plan.price}₽\n"
-        f"Срок действия: {plan.duration_days} дней\n\n"
-        f"Для оплаты переведите сумму на карту {settings.PAYMENT_PHONE} и отправьте скриншот оплаты.",
-        reply_markup=await cancel_payment_kb()
+        message_text,
+        reply_markup=await cancel_payment_kb(),
+        parse_mode="HTML"
     )
 
     await callback.answer()
+
 
 
 @router.message(NewPayment.waiting_for_screenshot, F.photo)
@@ -266,12 +274,30 @@ async def process_config_name(message: Message, state: FSMContext):
         await state.clear()
         return
 
-    # Проверим, есть ли уже кфг с таким именем
+    # 🔒 Проверка лимита устройств по тарифу
+    from asgiref.sync import sync_to_async
+
+    @sync_to_async
+    def is_limit_reached(user):
+        latest_purchase = user.purchases.filter(successful=True).select_related("user_plan").order_by(
+            "-created_at").first()
+        if not latest_purchase:
+            return True  # если нет активного плана, запретить создание
+        plan = latest_purchase.user_plan
+        return VpnClient.objects.filter(user=user, active=True).count() >= plan.max_devices
+
+    if await is_limit_reached(user):
+        await message.answer("❗ Вы достигли лимита устройств по вашему тарифному плану.")
+        await state.clear()
+        return
+
+    # Проверим, есть ли уже конфиг с таким именем
     exists = await sync_to_async(VpnClient.objects.filter(user=user, config_name=device_name).exists)()
     if exists:
         await message.answer("⚠️ Конфигурация с таким именем уже существует. Введите другое имя.")
         return
 
+    # Генерация и отправка конфига
     config_text = await issue_vpn_config(user, device_name)
     if not config_text:
         await message.answer("⚠️ Ошибка при получении конфигурации.")

@@ -29,6 +29,7 @@ class Plan(models.Model):
     price = models.DecimalField(max_digits=8, decimal_places=2)  # например: 299.00
     duration_days = models.PositiveIntegerField()  # срок действия в днях
     description = models.TextField(blank=True)
+    max_devices = models.IntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
