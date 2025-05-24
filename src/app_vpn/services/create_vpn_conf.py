@@ -1,13 +1,32 @@
 from .wg_api import create_wg_client, get_client_config
-from app_vpn.models import TgUser, VpnClient
+from app_vpn.models import TgUser, VpnClient, Plan
 from loguru import logger
 from asgiref.sync import sync_to_async
 
 
+@sync_to_async
+def get_active_plan(user: TgUser) -> Plan | None:
+    latest_purchase = user.purchases.filter(successful=True).order_by("-created_at").first()
+    return latest_purchase.user_plan if latest_purchase else None
+
+
+@sync_to_async
+def get_active_device_count(user: TgUser) -> int:
+    return VpnClient.objects.filter(user=user, active=True).count()
+
+
 async def issue_vpn_config(user: TgUser, device_name: str) -> str | None:
     logger.debug(f"Subscription active: {user.has_active_subscription()}")
-
     if not user.has_active_subscription():
+        return None
+
+    plan = await get_active_plan(user)
+    if not plan:
+        return None
+
+    current_device_count = await get_active_device_count(user)
+    if current_device_count >= plan.max_devices:
+        logger.info(f"⚠️ Превышено количество устройств: {current_device_count} / {plan.max_devices}")
         return None
 
     data = {
