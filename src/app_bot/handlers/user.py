@@ -29,7 +29,7 @@ router = Router()
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message):
-    if not message.from_user.full_name:
+    if not message.from_user.username:
         await message.answer(
             f"Привет, {message.from_user.full_name}!\nУ тебя не установлен username, установи его в"
             " настройках телеграма и напиши /start\nЕсли не знаешь как это сделать — посмотри"
